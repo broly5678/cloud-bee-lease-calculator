@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>云间蜜蜂科技｜租赁方案生成器</title>
+  <style>
+    :root { --brand: #e6a23c; --brand-hover: #d99020; --ink: #606266; --line: #e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: #f0f0f0; color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Arial, sans-serif; }
+    .page { width: min(100% - 32px, 576px); margin: 42px auto; }
+    .calculator { padding: 30px; background: #fff; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,.1); }
+    .header { text-align: center; color: #817568; margin-bottom: 20px; }
+    .header h1 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+    .header h2 { margin: 0; font-size: 16px; font-weight: 500; }
+    .form-group { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .form-group label { flex: 0 0 76px; color: var(--ink); font-size: 14px; white-space: nowrap; }
+    input, select { width: 100%; min-width: 0; height: 38px; padding: 7px 12px; color: #303133; font: inherit; border: 1px solid #dcdfe6; border-radius: 4px; outline: none; transition: border-color .2s, box-shadow .2s; }
+    input:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(230,162,60,.18); }
+    #initialRentSuffix { width: 20px; color: #909399; font-size: 14px; }
+    .button { width: 100%; margin-top: 8px; padding: 10px 16px; border: 1px solid var(--brand); border-radius: 4px; background: var(--brand); color: #fff; cursor: pointer; font: inherit; font-weight: 500; transition: background .2s, border-color .2s, box-shadow .2s; }
+    .button:hover { background: #ebb563; border-color: #ebb563; }
+    .button:focus-visible { outline: 3px solid rgba(230,162,60,.35); outline-offset: 2px; }
+    .result { display: none; margin-top: 20px; padding: 20px; border-radius: 8px; background: #fff; border: 1px solid #f2f2f2; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px 8px; border-bottom: 1px solid #d3d3d3; text-align: center; font-size: 14px; }
+    th { color: var(--ink); font-weight: 600; }
+    tr:last-child td { border-bottom: 0; }
+    .footer { padding-top: 20px; margin: 0; }
+    .note { margin: 14px 0 0 86px; color: #909399; font-size: 12px; line-height: 1.5; }
+    @media (max-width: 480px) { .page { width: min(100% - 20px, 576px); margin: 20px auto; } .calculator { padding: 24px 16px; } .form-group { align-items: flex-start; flex-wrap: wrap; gap: 6px; } .form-group label { flex-basis: 100%; } .note { margin-left: 0; } th, td { padding: 10px 4px; font-size: 13px; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="calculator" aria-labelledby="brand-title">
+      <header class="header">
+        <h1 id="brand-title">云间蜜蜂科技</h1>
+        <h2>租赁方案生成器</h2>
+      </header>
+
+      <form id="rentCalculator">
+        <div class="form-group">
+          <label for="rentAmount">租金金额</label>
+          <input type="number" id="rentAmount" placeholder="输入租金金额" min="0" step="0.01" required />
+        </div>
+        <div class="form-group">
+          <label for="leaseTerm">租赁期限</label>
+          <select id="leaseTerm" required>
+            <option value="" disabled selected>选择租赁期数</option>
+            <option value="4">4期</option><option value="5">5期</option><option value="6">6期</option>
+            <option value="7">7期</option><option value="8">8期</option><option value="9">9期</option><option value="10">10期</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="initialRent">首期租金</label>
+          <input type="number" id="initialRent" placeholder="输入首期租金" min="0" step="0.01" required aria-describedby="initialRentHint" />
+          <span id="initialRentSuffix" aria-hidden="true"></span>
+        </div>
+        <p class="note" id="initialRentHint">输入小于 100 时按百分比计算；否则按金额（元）计算。</p>
+        <button class="button" type="submit">计算</button>
+      </form>
+
+      <section id="result" class="result" aria-live="polite" aria-label="租赁方案结果">
+        <table>
+          <thead><tr><th>期数</th><th>付款日</th><th>租金</th></tr></thead>
+          <tbody id="resultTableBody"></tbody>
+        </table>
+      </section>
+      <footer class="header footer"><h2>Power By 云间蜜蜂科技</h2></footer>
+    </section>
+  </main>
+
+  <script>
+    // 与原页面相同：4–7期使用 55%，8–10期使用 68%。
+    const interestRate = [0.55, 0.68];
+    const currency = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const initialRentInput = document.getElementById('initialRent');
+    const initialRentSuffix = document.getElementById('initialRentSuffix');
+
+    initialRentInput.addEventListener('input', () => {
+      const value = Number.parseFloat(initialRentInput.value);
+      initialRentSuffix.textContent = Number.isFinite(value) ? (value < 100 ? '%' : '元') : '';
+    });
+
+    document.getElementById('rentCalculator').addEventListener('submit', (event) => {
+      event.preventDefault();
+      let rentAmount = Number.parseFloat(document.getElementById('rentAmount').value);
+      const leaseTerm = Number.parseInt(document.getElementById('leaseTerm').value, 10);
+      let initialRent = Number.parseFloat(initialRentInput.value);
+      if (!Number.isFinite(rentAmount) || !Number.isFinite(initialRent) || !Number.isFinite(leaseTerm)) return;
+
+      const interestRateNow = leaseTerm <= 7 ? interestRate[0] : interestRate[1];
+      if (initialRent < 100) initialRent = rentAmount * (initialRent / 100);
+      const paymentStart = new Date();
+      const tableBody = document.getElementById('resultTableBody');
+      tableBody.replaceChildren();
+
+      const addRow = (period, date, amount) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${period}</td><td>${date.toLocaleDateString('zh-CN')}</td><td>${currency.format(amount)} 元</td>`;
+        tableBody.appendChild(row);
+      };
+      addRow('首期租金', paymentStart, initialRent);
+
+      const remainingPrincipal = rentAmount - initialRent;
+      const totalWithInterest = remainingPrincipal + remainingPrincipal * interestRateNow;
+      const periodicRent = totalWithInterest / (leaseTerm - 1);
+      for (let i = 2; i <= leaseTerm; i += 1) {
+        const paymentDate = new Date();
+        paymentDate.setMonth(paymentDate.getMonth() + i - 1);
+        addRow(`第${i}期`, paymentDate, periodicRent);
+      }
+      document.getElementById('result').style.display = 'block';
+    });
+  </script>
+</body>
+</html>
